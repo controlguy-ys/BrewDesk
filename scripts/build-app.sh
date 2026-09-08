@@ -9,6 +9,7 @@ trap 'rm -rf "$build_root"' EXIT
 app_dir="$build_root/BrewDesk.app"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 cp "$bin_dir/BrewDesk" "$app_dir/Contents/MacOS/BrewDesk"
+cp assets/BrewDesk.icns "$app_dir/Contents/Resources/"
 cp THIRD_PARTY_NOTICES.md "$app_dir/Contents/Resources/"
 for bundle in "$bin_dir"/*.bundle; do
   if [ -d "$bundle" ]; then cp -R "$bundle" "$app_dir/Contents/Resources/"; fi
@@ -20,10 +21,11 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>BrewDesk</string>
 <key>CFBundleDisplayName</key><string>BrewDesk</string>
 <key>CFBundleIdentifier</key><string>dev.brewdesk.mac</string>
-<key>CFBundleVersion</key><string>2</string>
+<key>CFBundleVersion</key><string>3</string>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
 <key>CFBundleLocalizations</key><array><string>en</string><string>ko</string></array>
-<key>CFBundleShortVersionString</key><string>0.2.0</string>
+<key>CFBundleShortVersionString</key><string>0.2.1</string>
+<key>CFBundleIconFile</key><string>BrewDesk.icns</string>
 <key>CFBundleExecutable</key><string>BrewDesk</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
