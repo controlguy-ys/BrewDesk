@@ -75,3 +75,7 @@ Homebrew로 설치한 앱과 개발 도구를 조회하고, 선택한 변경을 
 ![한국어 설정](docs/media/language-ko.png)
 
 [추가 스크린샷과 촬영 정보](docs/media/README.md) · [서드파티 고지](THIRD_PARTY_NOTICES.md)
+
+## 라이선스
+
+BrewDesk는 [MIT 라이선스](LICENSE)를 따릅니다. 서드파티 구성 요소에는 각각의 라이선스가 적용됩니다. 자세한 내용은 [서드파티 고지](THIRD_PARTY_NOTICES.md)를 참고하세요.

@@ -112,3 +112,7 @@ History stores the latest 200 command records in `~/Library/Application Support/
 BrewDesk does not manage services, run Homebrew as root, or roll back changes. Self-updating and `latest` Casks have update-check limitations. Observed changes cannot always distinguish BrewDesk operations from concurrent external modifications.
 
 Built with SwiftUI and [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm). See [third-party notices](THIRD_PARTY_NOTICES.md). Homebrew command behavior is documented in the [Homebrew manual](https://docs.brew.sh/Manpage) and [JSON query documentation](https://docs.brew.sh/Querying-Brew).
+
+## License
+
+BrewDesk is licensed under the [MIT License](LICENSE). Third-party components retain their respective licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).

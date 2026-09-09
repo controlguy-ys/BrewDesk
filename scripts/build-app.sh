@@ -11,6 +11,7 @@ mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 cp "$bin_dir/BrewDesk" "$app_dir/Contents/MacOS/BrewDesk"
 cp assets/BrewDesk.icns "$app_dir/Contents/Resources/"
 cp THIRD_PARTY_NOTICES.md "$app_dir/Contents/Resources/"
+cp LICENSE "$app_dir/Contents/Resources/"
 for bundle in "$bin_dir"/*.bundle; do
   if [ -d "$bundle" ]; then cp -R "$bundle" "$app_dir/Contents/Resources/"; fi
 done
