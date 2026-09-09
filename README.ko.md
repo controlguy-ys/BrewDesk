@@ -4,7 +4,7 @@
 
 [English](README.md) · **한국어**
 
-[Apple Silicon DMG 다운로드](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.3.0) · [실제 조작 영상](docs/media/brewdesk-walkthrough.mp4)
+[Apple Silicon DMG 다운로드](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.3.1) · [실제 조작 영상](docs/media/brewdesk-walkthrough.mp4)
 
 ![BrewDesk 설치 목록](docs/media/installed-en.png)
 

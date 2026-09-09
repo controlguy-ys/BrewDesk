@@ -21,10 +21,10 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>BrewDesk</string>
 <key>CFBundleDisplayName</key><string>BrewDesk</string>
 <key>CFBundleIdentifier</key><string>dev.brewdesk.mac</string>
-<key>CFBundleVersion</key><string>5</string>
+<key>CFBundleVersion</key><string>6</string>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
 <key>CFBundleLocalizations</key><array><string>en</string><string>ko</string></array>
-<key>CFBundleShortVersionString</key><string>0.3.0</string>
+<key>CFBundleShortVersionString</key><string>0.3.1</string>
 <key>CFBundleIconFile</key><string>BrewDesk.icns</string>
 <key>CFBundleExecutable</key><string>BrewDesk</string>
 <key>CFBundlePackageType</key><string>APPL</string>

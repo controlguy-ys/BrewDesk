@@ -6,14 +6,14 @@ Your Homebrew apps and developer tools, in one native macOS app.
 
 **English** · [한국어](README.ko.md)
 
-[Download v0.3.0 for Apple Silicon](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.3.0) · [Watch the 60-second walkthrough](docs/media/brewdesk-walkthrough.mp4)
+[Download v0.3.1 for Apple Silicon](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.3.1) · [Watch the 60-second walkthrough](docs/media/brewdesk-walkthrough.mp4)
 
 ![BrewDesk installed packages](docs/media/installed-en.png)
 
 ## Download and run
 
 1. Install [Homebrew](https://brew.sh) if it is not already available.
-2. Download `BrewDesk-0.3.0-macos-arm64.dmg` from the [release page](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.3.0).
+2. Download `BrewDesk-0.3.1-macos-arm64.dmg` from the [release page](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.3.1).
 3. Open the DMG, drag **BrewDesk** into **Applications**, and launch it.
 4. BrewDesk detects the Homebrew environment. If more than one is available, choose one in **Settings**.
 
