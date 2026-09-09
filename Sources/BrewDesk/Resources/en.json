@@ -141,5 +141,11 @@
   "Homebrew 설명과 콘솔 원문은 번역하지 않습니다.": "Homebrew descriptions and raw console output are not translated.",
   "Homebrew 정의": "Homebrew definitions",
   "없음": "None",
-  "제거됨": "Removed"
+  "제거됨": "Removed",
+  "전체 선택": "Select all",
+  "선택 해제": "Deselect all",
+  "{0} 선택": "Select {0}",
+  "전체 업데이트 {0}개…": "Update all ({0})…",
+  "현재 표시된 항목을 모두 선택합니다.": "Select all currently visible packages.",
+  "검색·필터와 관계없이 업데이트 가능한 모든 항목을 확인합니다. 고정된 항목은 제외됩니다.": "Review all available updates, regardless of search or filters. Pinned packages are excluded."
 }

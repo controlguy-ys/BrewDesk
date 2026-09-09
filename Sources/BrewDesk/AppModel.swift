@@ -47,6 +47,16 @@ struct PendingOperation: Identifiable {
         }
     }
     var selected: [BrewPackage] { packages.filter { selection.contains($0.id) } }
+    var upgradeable: [BrewPackage] { packages.filter { $0.outdated && !$0.pinned } }
+    func selectAllVisible() { selection.formUnion(visible.map(\.id)) }
+    func clearSelection() { selection.removeAll() }
+    func setSelected(_ id: String, selected: Bool) {
+        if selected { selection.insert(id) } else { selection.remove(id) }
+    }
+    func prepareAllUpgrades() {
+        guard !unavailable, let env = environment, !upgradeable.isEmpty else { return }
+        pending = PendingOperation(action: .upgrade, packages: upgradeable, environment: env)
+    }
     var focused: BrewPackage? { selected.count == 1 ? selected.first : nil }
     var unavailable: Bool { busy || loading }
     func start() async {

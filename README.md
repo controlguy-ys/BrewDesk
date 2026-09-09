@@ -6,14 +6,14 @@ Your Homebrew apps and developer tools, in one native macOS app.
 
 **English** · [한국어](README.ko.md)
 
-[Download v0.2.1 for Apple Silicon](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.2.1) · [Watch the 60-second walkthrough](docs/media/brewdesk-walkthrough.mp4)
+[Download v0.2.2 for Apple Silicon](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.2.2) · [Watch the 60-second walkthrough](docs/media/brewdesk-walkthrough.mp4)
 
 ![BrewDesk installed packages](docs/media/installed-en.png)
 
 ## Download and run
 
 1. Install [Homebrew](https://brew.sh) if it is not already available.
-2. Download `BrewDesk-0.2.1-macos-arm64.dmg` from the [release page](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.2.1).
+2. Download `BrewDesk-0.2.2-macos-arm64.dmg` from the [release page](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.2.2).
 3. Open the DMG, drag **BrewDesk** into **Applications**, and launch it.
 4. BrewDesk detects the Homebrew environment. If more than one is available, choose one in **Settings**.
 
@@ -44,7 +44,7 @@ Select a package to inspect its details. Use **Check for updates** to review and
 
 Some Cask installers or uninstallers may request administrator authentication. These prompts come from the underlying Homebrew or installer operation; respond in the embedded terminal. BrewDesk does not provide a separate password form.
 
-Select one or more packages with Command-click, choose an update or removal, and review the confirmation. Changes run one at a time. After an operation, BrewDesk queries Homebrew again and records observed version changes, including dependencies.
+Use the checkbox to the left of each package to select it. Above the list, **Select all** adds all visible packages, **Deselect all** clears the entire selection, and the selection count includes selected packages hidden by filters. **⌘A** selects all visible rows when the table has focus; in the search field it selects the search text. Command-click and checkboxes share the same selection. **Update all (N)…** reviews every eligible installed update regardless of search or filters, excluding pinned packages. **Update selection** includes only selected packages with available updates, excluding pinned packages. One confirmation approves the reviewed batch. Changes run one at a time. After an operation, BrewDesk queries Homebrew again and records observed version changes, including dependencies.
 
 Formula removal is blocked when installed dependents are found. Cask removal uses ordinary `brew uninstall --cask`; Homebrew’s uninstall scripts may run. There is no forced removal or `--zap` cleanup. Stopping an operation sends Ctrl-C; it does not roll back changes. The app prevents quitting while an operation is active.
 

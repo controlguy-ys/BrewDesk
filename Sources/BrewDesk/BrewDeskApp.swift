@@ -25,6 +25,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         .defaultSize(width: 1320, height: 880)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(after: .pasteboard) {
+                Button(L("전체 선택")) {
+                    NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+                }.keyboardShortcut("a", modifiers: .command)
+            }
             CommandGroup(after: .toolbar) {
                 Button(L("설치 목록 새로고침")) { Task { await model.refresh() } }.keyboardShortcut("r").disabled(model.unavailable)
                 Button(L("업데이트 확인…")) { model.prepare(.update) }.disabled(model.unavailable || model.environment == nil)
@@ -98,12 +103,25 @@ struct ContentView: View {
             HStack {
                 Text(L("\(model.visible.count)개 항목")).font(.caption).foregroundStyle(.secondary)
                 if let date = model.lastLoaded { Text(L("· 조회 \(L10n.date(date, timeOnly: true))")).font(.caption).foregroundStyle(.tertiary) }
+                Button(L("전체 선택")) { model.selectAllVisible() }.disabled(model.visible.isEmpty)
+                    .help(L("현재 표시된 항목을 모두 선택합니다."))
+                Button(L("선택 해제")) { model.clearSelection() }.disabled(model.selection.isEmpty)
+                Text(L("\(model.selected.count)개 선택됨")).font(.caption).foregroundStyle(.secondary)
                 Spacer()
+                Button(L("전체 업데이트 \(model.upgradeable.count)개…")) { model.prepareAllUpgrades() }
+                    .disabled(model.unavailable || model.environment == nil || model.upgradeable.isEmpty)
+                    .help(L("검색·필터와 관계없이 업데이트 가능한 모든 항목을 확인합니다. 고정된 항목은 제외됩니다."))
                 if !model.selected.isEmpty { Button(L("선택 \(model.selected.count)개 업데이트…")) { model.prepare(.upgrade) }.disabled(model.unavailable || !model.selected.contains(where: { $0.outdated && !$0.pinned })) }
             }.padding(.horizontal, 24).padding(.bottom, 10)
             Divider()
             HSplitView {
                 Table(model.visible, selection: $model.selection) {
+                    TableColumn(L("선택")) { p in
+                        Toggle(L("\(p.name) 선택"), isOn: Binding(
+                            get: { model.selection.contains(p.id) },
+                            set: { model.setSelected(p.id, selected: $0) }
+                        )).toggleStyle(.checkbox).labelsHidden()
+                    }.width(56)
                     TableColumn(L("패키지")) { p in
                         HStack(spacing: 10) {
                             Image(systemName: p.kind.symbol).font(.title3).foregroundStyle(p.kind == .cask ? Color.orange : .blue).frame(width: 32, height: 32).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 7))
