@@ -18,7 +18,7 @@ struct PendingOperation: Identifiable {
     @Published var kind = "all"
     @Published var sort = "name"
     @Published var catalogQuery = ""
-    @Published var catalogKind: PackageKind = .formula
+    @Published var catalogKind: PackageKind? = nil
     @Published var catalogResults: [CatalogEntry] = []
     @Published var catalogPackage: BrewPackage?
     @Published var catalogLoading = false

@@ -4,7 +4,7 @@
 
 [English](README.md) · **한국어**
 
-[Apple Silicon DMG 다운로드](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.3.1) · [실제 조작 영상](docs/media/brewdesk-walkthrough.mp4)
+[Apple Silicon DMG 다운로드](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.3.2) · [실제 조작 영상](docs/media/brewdesk-walkthrough.mp4)
 
 ![BrewDesk 설치 목록](docs/media/installed-en.png)
 
@@ -41,7 +41,7 @@ Homebrew로 설치한 앱과 개발 도구를 조회하고, 선택한 변경을 
 
 ## 패키지 설치와 상단 버튼
 
-‘패키지 설치’ 탭에서 유형과 패키지 이름을 입력해 검색한 뒤, 결과를 선택하면 설명·버전·의존성·홈페이지를 확인할 수 있습니다. ‘설치…’에서 명령을 확인하고 실행합니다. 이미 설치된 패키지는 중복 설치를 막으며, 설치 후 실제 상태를 재조회해 작업 기록에 남깁니다. 검색 결과는 최대 200개입니다.
+‘패키지 설치’ 탭에서 기본값인 ‘전체 유형’으로 Formula와 Cask를 함께 검색하거나 유형을 좁힌 뒤, 결과를 선택하면 설명·버전·의존성·홈페이지를 확인할 수 있습니다. ‘설치…’에서 명령을 확인하고 실행합니다. 이미 설치된 패키지는 중복 설치를 막으며, 설치 후 실제 상태를 재조회해 작업 기록에 남깁니다. 검색 결과는 최대 200개입니다.
 
 우측 상단 왼쪽은 ‘업데이트 확인’으로 Homebrew 정의를 갱신하고, 오른쪽 ‘업데이트’는 가능한 전체 패키지 업데이트를 확인창에 표시합니다. 단순 목록 새로고침은 ⌘R 또는 보기 메뉴에서 실행합니다.
 

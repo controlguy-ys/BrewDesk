@@ -10,7 +10,8 @@ struct InstallView: View {
                 TextField(L("패키지 이름 검색"), text: $model.catalogQuery)
                     .onSubmit { Task { await model.searchCatalog() } }
                 Picker(L("유형"), selection: $model.catalogKind) {
-                    ForEach(PackageKind.allCases, id: \.self) { Text($0.title).tag($0) }
+                    Text(L("전체 유형")).tag(Optional<PackageKind>.none)
+                    ForEach(PackageKind.allCases, id: \.self) { Text($0.title).tag(Optional($0)) }
                 }.frame(width: 180).onChange(of: model.catalogKind) { _, _ in model.resetCatalog() }
                 Button(L("검색")) { Task { await model.searchCatalog() } }
                     .disabled(model.unavailable || model.catalogLoading || model.environment == nil || model.catalogQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -25,6 +26,7 @@ struct InstallView: View {
                                 HStack {
                                     Image(systemName: entry.kind.symbol)
                                     Text(entry.token)
+                                    Text(entry.kind.title).font(.caption).foregroundStyle(.secondary)
                                     Spacer()
                                     if model.packages.contains(where: { $0.id == entry.id }) { Text(L("설치됨")).foregroundStyle(.secondary) }
                                 }.padding(12).frame(maxWidth: .infinity).contentShape(Rectangle())
