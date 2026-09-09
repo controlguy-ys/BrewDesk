@@ -5,7 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var model: AppModel?
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard model?.busy == true else { return .terminateNow }
-        let alert = NSAlert(); alert.messageText = L("Homebrew 작업이 진행 중입니다")
+        let alert = NSAlert(); alert.messageText = L("패키지 작업이 진행 중입니다")
         alert.informativeText = L("작업이 끝날 때까지 기다리거나 콘솔에서 중단을 요청한 뒤 종료하세요. 중단은 변경 사항을 되돌리지 않습니다.")
         alert.addButton(withTitle: L("앱으로 돌아가기")); alert.runModal()
         return .terminateCancel
@@ -56,9 +56,18 @@ struct ContentView: View {
                         }.buttonStyle(.plain)
                     }
                 }.padding(.horizontal, 10)
+                VStack(alignment: .leading, spacing: 6) {
+                Text(L("패키지 관리자")).font(.caption).foregroundStyle(.secondary)
+                Picker(L("패키지 관리자"), selection: Binding(get: { model.environment?.id ?? "" }, set: { id in
+                    if let env = model.environments.first(where: { $0.id == id }) { Task { await model.connect(env) } }
+                })) {
+                    if model.environment == nil { Text(L("환경을 선택하세요")).tag("") }
+                    ForEach(model.environments) { env in Text(env.label).tag(env.id) }
+                }.labelsHidden().frame(maxWidth: .infinity).disabled(model.unavailable || model.catalogLoading)
+                }.padding(.horizontal, 14)
                 Spacer()
                 VStack(alignment: .leading, spacing: 8) {
-                    Label(model.environment == nil ? L("연결 대기") : L("Homebrew 연결됨"), systemImage: "circle.fill").font(.caption).foregroundStyle(model.environment == nil ? .secondary : Color.green)
+                    Label(model.environment == nil ? L("연결 대기") : (model.environment?.manager.title ?? ""), systemImage: "circle.fill").font(.caption).foregroundStyle(model.environment == nil ? .secondary : Color.green)
                     Text(model.environment?.prefix ?? L("환경을 선택하세요")).font(.caption.monospaced()).foregroundStyle(.secondary)
                     Text(L("변경 전 확인. 실행 후 검증.")).font(.caption2).foregroundStyle(.tertiary)
                 }.padding(18)
@@ -92,7 +101,7 @@ struct ContentView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(model.section == "updates" ? L("업데이트할 항목") : L("내 Mac의 패키지")).font(.system(size: 27, weight: .bold))
-                    Text(model.section == "updates" ? L("변경할 항목을 직접 선택하세요.") : L("Homebrew로 설치한 앱과 개발 도구를 한곳에서.")).foregroundStyle(.secondary)
+                    Text(model.section == "updates" ? L("변경할 항목을 직접 선택하세요.") : L("선택한 환경의 앱과 개발 도구를 한곳에서.")).foregroundStyle(.secondary)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) { Text("\(model.packages.count)").font(.system(size: 30, weight: .light, design: .rounded)); Text(L("설치된 패키지")).font(.caption).foregroundStyle(.secondary) }
@@ -101,7 +110,7 @@ struct ContentView: View {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField(L("이름, 도구 또는 설명 검색"), text: $model.search).textFieldStyle(.plain)
                 Picker(L("정렬"), selection: $model.sort) { Text(L("이름순")).tag("name"); Text(L("업데이트 우선")).tag("updates"); Text(L("유형순")).tag("kind") }.labelsHidden().frame(width: 130)
-                Picker(L("유형"), selection: $model.kind) { Text(L("전체 유형")).tag("all"); ForEach(PackageKind.allCases, id: \.rawValue) { Text($0.title).tag($0.rawValue) } }.labelsHidden().frame(width: 170)
+                Picker(L("유형"), selection: $model.kind) { Text(L("전체 유형")).tag("all"); ForEach(model.environment?.manager.kinds ?? [.formula, .cask], id: \.rawValue) { Text($0.title).tag($0.rawValue) } }.labelsHidden().frame(width: 170)
             }.padding(10).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 24).padding(.bottom, 16)
             HStack {
                 Text(L("\(model.visible.count)개 항목")).font(.caption).foregroundStyle(.secondary)
@@ -134,7 +143,7 @@ struct ContentView: View {
                     TableColumn(L("설치 버전")) { Text($0.installed.isEmpty ? L("확인되지 않음") : $0.installed).font(.system(.caption, design: .monospaced)).lineLimit(1) }.width(min: 90, ideal: 110)
                     TableColumn(L("상태")) { p in Text(p.status).font(.caption).foregroundStyle(p.outdated ? Color.orange : .secondary).lineLimit(2) }.width(min: 125, ideal: 155)
                 }
-                .overlay { if model.packages.isEmpty { ContentUnavailableView(model.loading ? L("설치 목록을 읽는 중") : L("표시할 패키지가 없습니다"), systemImage: "shippingbox", description: Text(model.environment == nil ? L("설정에서 Homebrew를 연결하세요.") : L("목록을 새로고침해 설치 상태를 확인하세요."))) } }
+                .overlay { if model.packages.isEmpty { ContentUnavailableView(model.loading ? L("설치 목록을 읽는 중") : L("표시할 패키지가 없습니다"), systemImage: "shippingbox", description: Text(model.environment == nil ? L("설정에서 패키지 관리자를 연결하세요.") : L("목록을 새로고침해 설치 상태를 확인하세요."))) } }
                 .frame(minWidth: 430)
                 detail.frame(minWidth: 270, idealWidth: 310, maxWidth: 380)
             }
@@ -147,7 +156,7 @@ struct ContentView: View {
                     Image(systemName: p.kind.symbol).font(.system(size: 32)).foregroundStyle(.orange).frame(width: 60, height: 60).background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
                     VStack(alignment: .leading, spacing: 5) { Text(p.name).font(.title2.bold()); Text(p.kind.title).font(.caption).foregroundStyle(.secondary); Text(p.summary.isEmpty ? L("설명 없음") : p.summary).padding(.top, 6).textSelection(.enabled) }
                     Divider()
-                    info(L("설치 버전"), p.installed); info(L("Homebrew 제공 버전"), p.available); info(L("저장소"), p.tap)
+                    info(L("설치 버전"), p.installed); info(L("제공 버전"), p.available); info(L("저장소"), p.tap)
                     if p.autoUpdates || p.available == "latest" { Text(L("자체 업데이트 항목은 기본 업데이트 조회에서 제외될 수 있습니다.")).font(.caption).foregroundStyle(.orange) }
                     HStack { Button(L("업데이트…")) { model.prepare(.upgrade) }.buttonStyle(.borderedProminent).disabled(model.unavailable || !p.outdated || p.pinned); Button(L("제거…"), role: .destructive) { model.prepare(.uninstall) }.disabled(model.unavailable) }
                     if let url = URL(string: p.homepage), ["https", "http"].contains(url.scheme ?? "") { Link(destination: url) { Label(L("홈페이지"), systemImage: "arrow.up.right.square") } }
@@ -169,19 +178,20 @@ struct ContentView: View {
                     ForEach(AppLanguage.allCases) { language in Text(language.title).tag(language) }
                 }
                 Text(L("언어 변경은 즉시 적용되며 다음 실행에도 유지됩니다."))
-                Text(L("Homebrew 설명과 콘솔 원문은 번역하지 않습니다.")).foregroundStyle(.secondary)
+                Text(L("패키지 설명과 콘솔 원문은 번역하지 않습니다.")).foregroundStyle(.secondary)
             }
-            Section(L("Homebrew 환경")) {
+            Section(L("패키지 관리자 환경")) {
                 Text(L("환경별 설치 목록을 분리합니다. 연결 시 업데이트나 재설치를 실행하지 않습니다."))
                 ForEach(model.environments) { env in
-                    HStack { VStack(alignment: .leading) { Text(env.version); Text(env.executable).font(.caption.monospaced()) }; Spacer(); Button(model.environment == env ? L("연결됨") : L("선택")) { Task { await model.connect(env) } }.disabled(model.unavailable || model.environment == env) }
+                    HStack { VStack(alignment: .leading) { Text(env.version); Text(env.manager.scope); Text(env.prefix).font(.caption); Text(env.executable).font(.caption.monospaced()) }; Spacer(); Button(model.environment == env ? L("연결됨") : L("선택")) { Task { await model.connect(env) } }.disabled(model.unavailable || model.environment == env) }
                 }
-                Button(L("Homebrew 실행 파일 지정…")) { model.chooseExecutable() }.disabled(model.unavailable)
+                Picker(L("추가할 관리자"), selection: $model.executableManager) { ForEach(PackageManager.allCases) { manager in Text(manager.title).tag(manager) } }
+                Button(L("실행 파일 지정…")) { model.chooseExecutable() }.disabled(model.unavailable)
                 Link(L("Homebrew 공식 설치 안내"), destination: URL(string: "https://brew.sh")!)
             }
             Section(L("업데이트 확인")) {
                 Text(model.lastChecked.map { L("정의 갱신 및 조회: \(L10n.date($0))") } ?? L("이 실행에서 아직 업데이트를 확인하지 않았습니다."))
-                Text(L("목록 새로고침은 현재 정의로 상태를 조회합니다. 업데이트 확인은 brew update를 실행합니다.")).foregroundStyle(.secondary)
+                Text(L("업데이트 확인은 선택한 환경만 조회합니다. Homebrew는 먼저 brew update를 실행합니다. 다른 관리자는 설치된 패키지의 새 버전을 조회합니다.")).foregroundStyle(.secondary)
             }
             Section(L("작업과 기록")) {
                 Text(L("변경은 한 번에 하나씩 실행하며, 실패하면 남은 대기열을 멈춥니다. 제거는 일반 uninstall만 사용합니다."))
@@ -218,7 +228,9 @@ struct ContentView: View {
             Text(request.environment.executable).font(.caption.monospaced()).foregroundStyle(.secondary)
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    if request.action == .update { Text(L("Homebrew와 패키지 정의를 갱신한 뒤 업데이트 대상을 조회합니다. 설치된 패키지의 업그레이드는 별도 선택합니다.")) }
+                    Text(request.environment.manager.scope).font(.headline)
+                    Text(request.environment.prefix).font(.caption.monospaced())
+                    if request.action == .update { Text(request.environment.manager == .homebrew ? L("Homebrew와 패키지 정의를 갱신한 뒤 업데이트 대상을 조회합니다. 설치된 패키지의 업그레이드는 별도 선택합니다.") : L("선택한 환경의 업데이트 가능한 버전을 조회합니다. 패키지는 변경하지 않습니다.")) }
                     ForEach(request.packages) { p in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(p.name).bold(); Text(request.action == .upgrade ? "\(p.installed) → \(p.available)" : request.action == .install ? L("설치할 버전 \(p.available)") : L("설치 버전 \(p.installed)"))
@@ -227,7 +239,8 @@ struct ContentView: View {
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }.frame(maxHeight: 240)
-            Text(request.action == .uninstall ? L("설정·캐시 정리(--zap)와 강제 제거는 사용하지 않습니다. 사용 중인 Formula는 제거를 차단합니다. Cask에 포함된 제거 스크립트가 실행될 수 있습니다.") : L("의존 패키지 등 추가 변경이 발생할 수 있습니다. 실제 변경은 실행 후 기록됩니다.")).font(.callout).foregroundStyle(.secondary)
+            if request.action != .update { Text(request.action == .uninstall && request.environment.manager == .homebrew ? L("설정·캐시 정리(--zap)와 강제 제거는 사용하지 않습니다. 사용 중인 Formula는 제거를 차단합니다. Cask에 포함된 제거 스크립트가 실행될 수 있습니다.") : L("의존 패키지 등 추가 변경이 발생할 수 있습니다. 실제 변경은 실행 후 기록됩니다.")).font(.callout).foregroundStyle(.secondary) }
+            if request.action == .uninstall, request.environment.manager == .gem { Text(L("선택한 gem의 설치된 모든 버전과 실행 파일을 제거합니다.")) }
             HStack { Spacer(); Button(L("취소")) { model.pending = nil }.keyboardShortcut(.cancelAction); Button(request.action == .uninstall ? L("제거 실행") : request.action == .install ? L("설치 실행") : L("실행")) { Task { await model.execute(request) } }.buttonStyle(.borderedProminent) }
         }.padding(28).frame(width: 540)
     }

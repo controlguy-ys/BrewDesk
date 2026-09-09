@@ -73,6 +73,14 @@ final class BrewTerminalView: LocalProcessTerminalView {
             self.confirmation = self.detector.confirmation
         }
     }
+    func showReadResult(command: String, output: String) {
+        guard !terminal.process.running else { return }
+        clearConfirmation(); self.command = command; log = output
+        let view = BrewTerminalView(frame: NSRect(x: 0, y: 0, width: 1000, height: 230))
+        view.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        view.feed(text: output.replacingOccurrences(of: "\n", with: "\r\n"))
+        terminal = view
+    }
     func run(_ command: BrewCommand) async -> Int32 {
         clearConfirmation()
         self.command = command.display; log = ""

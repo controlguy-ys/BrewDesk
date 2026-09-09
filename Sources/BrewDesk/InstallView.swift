@@ -5,16 +5,20 @@ struct InstallView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(L("패키지 설치")).font(.largeTitle.bold())
-            Text(L("Homebrew에서 패키지를 검색하고 내용을 확인한 뒤 설치하세요.")).foregroundStyle(.secondary)
+            Text(L("선택한 패키지 관리자에서 검색하고 내용을 확인한 뒤 설치하세요.")).foregroundStyle(.secondary)
             HStack {
                 TextField(L("패키지 이름 검색"), text: $model.catalogQuery)
                     .onSubmit { Task { await model.searchCatalog() } }
-                Picker(L("유형"), selection: $model.catalogKind) {
+                if model.environment?.manager == .homebrew { Picker(L("유형"), selection: $model.catalogKind) {
                     Text(L("전체 유형")).tag(Optional<PackageKind>.none)
-                    ForEach(PackageKind.allCases, id: \.self) { Text($0.title).tag(Optional($0)) }
-                }.frame(width: 180).onChange(of: model.catalogKind) { _, _ in model.resetCatalog() }
+                    ForEach([PackageKind.formula, .cask], id: \.self) { Text($0.title).tag(Optional($0)) }
+                }.frame(width: 180).onChange(of: model.catalogKind) { _, _ in model.resetCatalog() } }
                 Button(L("검색")) { Task { await model.searchCatalog() } }
                     .disabled(model.unavailable || model.catalogLoading || model.environment == nil || model.catalogQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            if let env = model.environment {
+                Text(env.manager.scope + " · " + env.prefix).font(.caption).foregroundStyle(.secondary)
+                if env.manager != .homebrew && env.manager != .npm { Text(L("정확한 패키지 이름을 입력하세요. Python 계열은 PyPI, Cargo는 crates.io, RubyGems는 rubygems.org에서 조회합니다.")).font(.caption).foregroundStyle(.secondary) }
             }
             if model.catalogLoading { ProgressView().controlSize(.small) }
             if let error = model.catalogError { Text(error).foregroundStyle(.red).textSelection(.enabled) }
@@ -33,7 +37,7 @@ struct InstallView: View {
                             }.buttonStyle(.plain).disabled(model.unavailable || model.catalogLoading)
                         }
                         if model.catalogResults.isEmpty && !model.catalogLoading {
-                            Text(model.environment == nil ? L("설정에서 Homebrew를 연결하세요.") : model.catalogSearched ? L("검색 결과가 없습니다.") : L("검색할 패키지 이름을 입력하세요.")).foregroundStyle(.secondary).padding()
+                            Text(model.environment == nil ? L("설정에서 패키지 관리자를 연결하세요.") : model.catalogSearched ? L("검색 결과가 없습니다.") : L("검색할 패키지 이름을 입력하세요.")).foregroundStyle(.secondary).padding()
                         }
                         if model.catalogResults.count == 200 { Text(L("최대 200개 결과입니다. 검색어를 좁혀주세요.")).font(.caption) }
                     }

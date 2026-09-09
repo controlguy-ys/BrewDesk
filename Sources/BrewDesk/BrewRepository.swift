@@ -4,7 +4,7 @@ struct ProcessResult { let output: Data; let error: Data; let status: Int32 }
 enum ProcessRunner {
     static func environment(for executable: String) -> [String: String] {
         var env = ProcessInfo.processInfo.environment
-        env["PATH"] = URL(fileURLWithPath: executable).deletingLastPathComponent().path + ":/usr/bin:/bin:/usr/sbin:/sbin"
+        env["PATH"] = URL(fileURLWithPath: executable).deletingLastPathComponent().path + ":/opt/homebrew/bin:/usr/local/bin:" + (env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin")
         env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
         env["HOMEBREW_NO_ANALYTICS"] = "1"
         env["HOMEBREW_NO_ENV_HINTS"] = "1"
@@ -17,13 +17,19 @@ enum ProcessRunner {
             p.arguments = command.arguments
             p.environment = environment(for: command.executable)
             p.standardOutput = out; p.standardError = err; p.standardInput = FileHandle.nullDevice
-            try p.run()
-            // Drain both streams concurrently: large stderr must never block stdout.
-            let errorTask = Task.detached { err.fileHandleForReading.readDataToEndOfFile() }
-            let output = out.fileHandleForReading.readDataToEndOfFile()
-            let error = await errorTask.value
-            p.waitUntilExit()
-            return ProcessResult(output: output, error: error, status: p.terminationStatus)
+            // Drain both streams while the child runs, and register exit observation before launch.
+            // Foundation waitUntilExit can stall on a finished short-lived child on macOS.
+            async let output = Task.detached { out.fileHandleForReading.readDataToEndOfFile() }.value
+            async let error = Task.detached { err.fileHandleForReading.readDataToEndOfFile() }.value
+            let status: Int32 = try await withCheckedThrowingContinuation { continuation in
+                p.terminationHandler = { process in continuation.resume(returning: process.terminationStatus) }
+                do { try p.run() }
+                catch {
+                    out.fileHandleForWriting.closeFile(); err.fileHandleForWriting.closeFile()
+                    continuation.resume(throwing: error)
+                }
+            }
+            return await ProcessResult(output: output, error: error, status: status)
         }.value
     }
 }
@@ -41,12 +47,17 @@ struct BrewRepository {
         let prefix = String(decoding: try await query(stub, ["--prefix"]), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         return BrewEnvironment(executable: path, prefix: prefix, version: version)
     }
-    func installed(_ environment: BrewEnvironment) async throws -> [BrewPackage] { try BrewJSON.packages(await query(environment, ["info", "--json=v2", "--installed"])) }
+    func installed(_ environment: BrewEnvironment, checkingUpdates: Bool = false) async throws -> [BrewPackage] {
+        if environment.manager != .homebrew { return try await managerInstalled(environment, checkingUpdates: checkingUpdates) }
+        return try BrewJSON.packages(await query(environment, ["info", "--json=v2", "--installed"]))
+    }
     func dependents(_ package: BrewPackage, environment: BrewEnvironment) async throws -> [String] {
+        if environment.manager == .pip { return try await pipDependents(package, environment: environment) }
         guard package.kind == .formula else { return [] }
         return String(decoding: try await query(environment, ["uses", "--installed", "--recursive", package.token]), as: UTF8.self).split(whereSeparator: \.isWhitespace).map(String.init)
     }
     func paths(_ package: BrewPackage, environment: BrewEnvironment) async throws -> [String] {
+        if environment.manager != .homebrew { return [] }
         let data = try await query(environment, ["list", "--\(package.kind.rawValue)", package.token])
         return String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init).filter { $0.hasPrefix("/") && FileManager.default.fileExists(atPath: $0) }
     }

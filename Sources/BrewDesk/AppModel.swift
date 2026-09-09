@@ -8,6 +8,7 @@ struct PendingOperation: Identifiable {
     let environment: BrewEnvironment
 }
 @MainActor final class AppModel: ObservableObject {
+    @Published var executableManager: PackageManager = .homebrew
     @Published var environments: [BrewEnvironment] = []
     @Published var environment: BrewEnvironment?
     @Published var packages: [BrewPackage] = []
@@ -27,7 +28,7 @@ struct PendingOperation: Identifiable {
     private var catalogRequest = UUID()
     @Published var loading = false
     @Published var busy = false
-    @Published var statusMessage = M("Homebrew를 찾는 중")
+    @Published var statusMessage = M("패키지 관리자를 찾는 중")
     var status: String { statusMessage.rendered() }
     @Published var error: String?
     @Published var lastLoaded: Date?
@@ -109,34 +110,46 @@ struct PendingOperation: Identifiable {
         guard !booted else { return }; booted = true
         do { history = try historyStore.load() } catch { self.error = L("작업 기록을 읽지 못했습니다: \(error.localizedDescription)") }
         loading = true
-        var candidates = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
-        if let custom = UserDefaults.standard.string(forKey: "brewPath"), !candidates.contains(custom) { candidates.append(custom) }
-        for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
-            do { environments.append(try await repository.resolve(path)) }
-            catch { self.error = error.localizedDescription }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let directories = ["/opt/homebrew/bin", "/usr/local/bin", home + "/.local/bin", home + "/.cargo/bin", "/usr/bin"] + (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
+        for manager in PackageManager.allCases {
+            var candidates = directories.filter { $0.hasPrefix("/") }.map { $0 + "/" + manager.executableName }
+            if let custom = UserDefaults.standard.string(forKey: "executable.\(manager.rawValue)") { candidates.insert(custom, at: 0) }
+            if manager == .homebrew, let custom = UserDefaults.standard.string(forKey: "brewPath") { candidates.insert(custom, at: 0) }
+            var seen = Set<String>()
+            for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
+                // Keep the original executable path (not the symlink target): Cargo may be a rustup proxy.
+                let canonical = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+                guard seen.insert(canonical).inserted else { continue }
+                do { environments.append(try await repository.resolve(path, manager: manager)) }
+                catch { /* Other valid environments remain available. Custom files can be retried in Settings. */ }
+            }
         }
         loading = false
-        if let saved = UserDefaults.standard.string(forKey: "brewPath"), let found = environments.first(where: { $0.executable == saved }) { await connect(found) }
-        else if environments.count == 1 { await connect(environments[0]) }
-        else { statusMessage = environments.isEmpty ? M("Homebrew를 찾지 못했습니다") : M("사용할 Homebrew 환경을 선택하세요"); section = "settings" }
+        let saved = UserDefaults.standard.string(forKey: "environmentPath") ?? UserDefaults.standard.string(forKey: "brewPath")
+        if let found = environments.first(where: { $0.executable == saved }) { await connect(found) }
+        else if let first = environments.first { await connect(first) }
+        else { statusMessage = M("패키지 관리자를 찾지 못했습니다"); section = "settings" }
     }
     func connect(_ env: BrewEnvironment) async {
         guard !unavailable else { return }
-        resetCatalog()
+        resetCatalog(); kind = "all"; catalogKind = nil; search = ""; pending = nil
         environment = env; packages = []; selection = []; paths = []; dependents = []; lastChecked = nil; lastLoaded = nil
-        UserDefaults.standard.set(env.executable, forKey: "brewPath")
+        UserDefaults.standard.set(env.executable, forKey: "environmentPath")
+        UserDefaults.standard.set(env.executable, forKey: "executable.\(env.manager.rawValue)")
         section = "installed"
         await refresh()
     }
     func chooseExecutable() {
         guard !unavailable else { return }
         let panel = NSOpenPanel(); panel.canChooseDirectories = false; panel.canChooseFiles = true
-        panel.message = L("신뢰할 수 있는 Homebrew 실행 파일(brew)을 선택하세요. 선택한 파일을 실행해 버전을 확인합니다.")
+        panel.message = L("선택한 패키지 관리자의 신뢰할 수 있는 실행 파일을 지정하세요. 버전과 환경을 확인하기 위해 실행합니다.")
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        let manager = executableManager
         loading = true
         Task {
             do {
-                let env = try await repository.resolve(url.path)
+                let env = try await repository.resolve(url.path, manager: manager)
                 if !environments.contains(env) { environments.append(env) }
                 loading = false; await connect(env)
             } catch { loading = false; self.error = error.localizedDescription }
@@ -146,7 +159,7 @@ struct PendingOperation: Identifiable {
         guard !unavailable, let env = environment else { return }
         loading = true; statusMessage = M("설치 상태 조회 중")
         do {
-            packages = try await repository.installed(env)
+            packages = try await repository.installed(env, checkingUpdates: lastChecked != nil)
             selection.formIntersection(Set(packages.map(\.id)))
             lastLoaded = Date(); statusMessage = M("\(packages.count)개 패키지 · 설치 상태 확인됨")
         } catch { self.error = error.localizedDescription; statusMessage = M("조회 실패 · 기존 목록 유지") }
@@ -175,12 +188,20 @@ struct PendingOperation: Identifiable {
         guard !unavailable, request.environment == environment else { return }
         busy = true; operationStarted = Date(); cancelled = false; consoleExpanded = true; pending = nil
         defer { busy = false; operationStarted = nil; queueRemaining = 0 }
+        if request.action == .update, request.environment.manager != .homebrew {
+            await checkManagerUpdates(request.environment)
+            return
+        }
         let targets: [BrewPackage?] = request.action == .update ? [nil] : request.packages.map(Optional.some)
         for (index, target) in targets.enumerated() {
             if cancelled { break }
             queueRemaining = targets.count - index - 1
             statusMessage = M("실행 전 상태 확인 · \(target?.name ?? L("업데이트 확인"))")
             do {
+                if request.environment.manager != .homebrew {
+                    let resolved = try await repository.resolve(request.environment.executable, manager: request.environment.manager)
+                    guard resolved.prefix == request.environment.prefix else { throw BrewError.message(L("설치 환경이 바뀌었습니다. 다시 연결하세요.")) }
+                }
                 let before = try await repository.installed(request.environment)
                 if let target {
                     if request.action == .install {
@@ -202,7 +223,7 @@ struct PendingOperation: Identifiable {
                 var result = cancelled ? M("중단 요청됨 · 원상 복구 아님") : (exitCode == 0 ? M("명령 완료") : M("실패 (종료 코드 \(exitCode))"))
                 var verificationFailed = false
                 do {
-                    let after = try await repository.installed(request.environment)
+                    let after = try await repository.installed(request.environment, checkingUpdates: request.action == .upgrade)
                     changes = VersionChange.between(before, after)
                     packages = after; lastLoaded = Date()
                     selection.formIntersection(Set(after.map(\.id)))
@@ -210,8 +231,8 @@ struct PendingOperation: Identifiable {
                         verificationFailed = true; result = M("검증 실패 · 설치된 대상을 찾지 못함")
                     }
                     if request.action == .uninstall, let target, exitCode == 0, after.contains(where: { $0.id == target.id }) { verificationFailed = true; result = M("검증 실패 · 대상이 아직 설치되어 있음") }
-                    if request.action == .upgrade, let target, exitCode == 0, after.first(where: { $0.id == target.id })?.outdated != false { verificationFailed = true; result = M("검증 필요 · 업데이트 상태 미해결") }
-                    if request.action == .update, exitCode == 0 {
+                    if request.action == .upgrade, let target, exitCode == 0, (after.first(where: { $0.id == target.id })?.outdated != false || (request.environment.manager != .homebrew && after.first(where: { $0.id == target.id })?.installed != target.available)) { verificationFailed = true; result = M("검증 필요 · 업데이트 상태 미해결") }
+                    if request.action == .update, request.environment.manager == .homebrew, exitCode == 0 {
                         _ = try BrewJSON.outdatedIDs(await repository.query(request.environment, ["outdated", "--json=v2"]))
                         lastChecked = Date()
                     }
@@ -229,6 +250,22 @@ struct PendingOperation: Identifiable {
                 break
             }
         }
+    }
+    private func checkManagerUpdates(_ env: BrewEnvironment) async {
+        statusMessage = M("업데이트 조회 중")
+        runner.showReadResult(command: env.manager.title + ": " + L("업데이트 확인"), output: statusMessage.rendered())
+        var result = M("업데이트 조회 완료"), exitCode: Int32 = 0
+        do {
+            let refreshed = try await repository.installed(env, checkingUpdates: true)
+            if cancelled { statusMessage = M("중단 요청됨 · 원상 복구 아님"); return }
+            packages = refreshed; lastLoaded = Date(); lastChecked = Date()
+            selection.formIntersection(Set(packages.map(\.id)))
+        } catch { self.error = error.localizedDescription; result = M("업데이트 조회에 실패했습니다."); exitCode = -1 }
+        let record = OperationRecord(id: UUID(), date: Date(), environment: env.executable, command: "\(env.manager.title): \(L("업데이트 확인"))", exitCode: exitCode, result: result.rendered(), changes: [], log: exitCode == 0 ? packages.filter(\.outdated).map { "\($0.token): \($0.installed) → \($0.available)" }.joined(separator: "\n") : (error ?? ""), localizedResult: result)
+        runner.showReadResult(command: record.command, output: result.rendered() + "\n" + record.log)
+        history.insert(record, at: 0)
+        do { try historyStore.save(history) } catch { self.error = error.localizedDescription }
+        statusMessage = result
     }
     func cancel() { cancelled = true; statusMessage = M("중단 요청 중 · 종료 후 실제 상태를 확인합니다"); runner.interrupt() }
     func copyLog(_ text: String) { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string) }

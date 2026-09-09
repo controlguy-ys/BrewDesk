@@ -1,8 +1,28 @@
 import Foundation
 
-enum PackageKind: String, Codable, CaseIterable { case formula, cask
-    var title: String { self == .formula ? L("도구·라이브러리") : L("앱·기타 Cask") }
-    var symbol: String { self == .formula ? "terminal" : "app.dashed" }
+enum PackageManager: String, Codable, CaseIterable, Identifiable {
+    case homebrew, npm, pip, pipx, uv, cargo, gem
+    var id: String { rawValue }
+    var title: String { switch self {
+        case .homebrew: return "Homebrew"; case .npm: return "npm"; case .pip: return "pip3"
+        case .pipx: return "pipx"; case .uv: return "uv"; case .cargo: return "Cargo"; case .gem: return "RubyGems"
+    } }
+    var executableName: String { self == .homebrew ? "brew" : self == .pip ? "pip3" : rawValue }
+    var kinds: [PackageKind] { self == .homebrew ? [.formula, .cask] : [PackageKind(rawValue: rawValue)!] }
+    var scope: String { switch self {
+        case .homebrew: return L("Homebrew 설치 환경")
+        case .npm: return L("전역 npm 패키지")
+        case .pip: return L("선택한 pip3 환경")
+        case .pipx, .uv: return L("격리된 Python 도구")
+        case .cargo: return L("Cargo 설치 바이너리")
+        case .gem: return L("선택한 RubyGems 환경")
+    } }
+}
+enum PackageKind: String, Codable, CaseIterable {
+    case formula, cask, npm, pip, pipx, uv, cargo, gem
+    var manager: PackageManager { self == .formula || self == .cask ? .homebrew : PackageManager(rawValue: rawValue)! }
+    var title: String { self == .formula ? L("도구·라이브러리") : self == .cask ? L("앱·기타 Cask") : manager.title }
+    var symbol: String { self == .cask ? "app.dashed" : "terminal" }
 }
 struct BrewPackage: Identifiable, Hashable, Codable {
     var id: String { "\(kind.rawValue):\(token)" }
@@ -22,7 +42,7 @@ struct BrewPackage: Identifiable, Hashable, Codable {
         if pinned { return L("고정됨") }
         if outdated { return L("업데이트 가능") }
         if autoUpdates || available == "latest" { return L("자체 업데이트 / 확인 제한") }
-        return L("로컬 정의 기준 일치")
+        if available.isEmpty { return L("업데이트 확인 전") }; return kind.manager == .homebrew ? L("로컬 정의 기준 일치") : L("조회 기준 최신")
     }
 }
 struct BrewEnvironment: Identifiable, Hashable, Codable {
@@ -30,6 +50,8 @@ struct BrewEnvironment: Identifiable, Hashable, Codable {
     let executable: String
     let prefix: String
     let version: String
+    var manager: PackageManager = .homebrew
+    var label: String { "\(manager.title) · \(prefix) · \(executable)" }
 }
 enum BrewAction: String, Codable { case upgrade, uninstall, update, install }
 struct BrewCommand: Equatable {
@@ -43,9 +65,10 @@ enum BrewError: LocalizedError {
 }
 enum BrewCommandFactory {
     static func mutation(_ action: BrewAction, package: BrewPackage?, environment: BrewEnvironment) throws -> BrewCommand {
+        if environment.manager != .homebrew { return try ManagerCommands.mutation(action, package: package, environment: environment) }
         guard environment.executable.hasPrefix("/") else { throw BrewError.message(L("Homebrew 절대 경로가 필요합니다.")) }
         if action == .update { return BrewCommand(executable: environment.executable, arguments: ["update"]) }
-        guard let package, package.token.range(of: #"^[A-Za-z0-9][A-Za-z0-9@+._/-]*$"#, options: .regularExpression) != nil,
+        guard let package, package.kind.manager == .homebrew, package.token.range(of: #"^[A-Za-z0-9][A-Za-z0-9@+._/-]*$"#, options: .regularExpression) != nil,
               !package.token.split(separator: "/").contains("..") else { throw BrewError.message(L("유효하지 않은 패키지 식별자입니다.")) }
         return BrewCommand(executable: environment.executable, arguments: [action.rawValue, "--\(package.kind.rawValue)", package.token])
     }
