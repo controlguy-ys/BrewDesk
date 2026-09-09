@@ -17,6 +17,14 @@ struct PendingOperation: Identifiable {
     @Published var search = ""
     @Published var kind = "all"
     @Published var sort = "name"
+    @Published var catalogQuery = ""
+    @Published var catalogKind: PackageKind = .formula
+    @Published var catalogResults: [CatalogEntry] = []
+    @Published var catalogPackage: BrewPackage?
+    @Published var catalogLoading = false
+    @Published var catalogError: String?
+    @Published var catalogSearched = false
+    private var catalogRequest = UUID()
     @Published var loading = false
     @Published var busy = false
     @Published var statusMessage = M("Homebrew를 찾는 중")
@@ -59,6 +67,44 @@ struct PendingOperation: Identifiable {
     }
     var focused: BrewPackage? { selected.count == 1 ? selected.first : nil }
     var unavailable: Bool { busy || loading }
+    func resetCatalog() {
+        catalogRequest = UUID(); catalogResults = []; catalogPackage = nil
+        catalogLoading = false; catalogError = nil; catalogSearched = false
+    }
+    func searchCatalog() async {
+        guard !unavailable, let env = environment else { return }
+        let request = UUID(); catalogRequest = request
+        let query = catalogQuery, kind = catalogKind
+        catalogLoading = true; catalogPackage = nil; catalogResults = []; catalogError = nil; catalogSearched = true
+        do {
+            let results = try await repository.search(query, kind: kind, environment: env)
+            guard catalogRequest == request, environment == env else { return }
+            catalogResults = results
+        } catch {
+            guard catalogRequest == request, environment == env else { return }
+            catalogError = error.localizedDescription
+        }
+        if catalogRequest == request { catalogLoading = false }
+    }
+    func inspectCatalog(_ entry: CatalogEntry) async {
+        guard !unavailable, let env = environment else { return }
+        let request = UUID(); catalogRequest = request
+        catalogPackage = nil; catalogLoading = true; catalogError = nil
+        do {
+            let package = try await repository.catalogInfo(entry, environment: env)
+            guard catalogRequest == request, environment == env else { return }
+            catalogPackage = package
+        } catch {
+            guard catalogRequest == request, environment == env else { return }
+            catalogError = error.localizedDescription
+        }
+        if catalogRequest == request { catalogLoading = false }
+    }
+    func prepareInstall() {
+        guard !unavailable, !catalogLoading, let env = environment, let package = catalogPackage,
+              package.installed.isEmpty, !packages.contains(where: { $0.id == package.id }) else { return }
+        pending = PendingOperation(action: .install, packages: [package], environment: env)
+    }
     func start() async {
         guard !booted else { return }; booted = true
         do { history = try historyStore.load() } catch { self.error = L("작업 기록을 읽지 못했습니다: \(error.localizedDescription)") }
@@ -76,6 +122,7 @@ struct PendingOperation: Identifiable {
     }
     func connect(_ env: BrewEnvironment) async {
         guard !unavailable else { return }
+        resetCatalog()
         environment = env; packages = []; selection = []; paths = []; dependents = []; lastChecked = nil; lastLoaded = nil
         UserDefaults.standard.set(env.executable, forKey: "brewPath")
         section = "installed"
@@ -136,7 +183,11 @@ struct PendingOperation: Identifiable {
             do {
                 let before = try await repository.installed(request.environment)
                 if let target {
+                    if request.action == .install {
+                        guard !before.contains(where: { $0.id == target.id }) else { throw BrewError.message(L("이미 설치된 패키지입니다. 설치 목록에서 확인하세요.")) }
+                    } else {
                     guard before.contains(where: { $0.id == target.id && $0.installed == target.installed }) else { throw BrewError.message(L("\(target.name)의 설치 상태가 바뀌었습니다. 목록을 새로고침하고 다시 선택하세요.")) }
+                    }
                     if request.action == .uninstall {
                         let users = try await repository.dependents(target, environment: request.environment)
                         guard users.isEmpty else { throw BrewError.message(L("\(target.name)을 사용하는 설치 항목이 있어 제거하지 않았습니다: \(users.joined(separator: ", "))")) }
@@ -155,6 +206,9 @@ struct PendingOperation: Identifiable {
                     changes = VersionChange.between(before, after)
                     packages = after; lastLoaded = Date()
                     selection.formIntersection(Set(after.map(\.id)))
+                    if request.action == .install, let target, exitCode == 0, !after.contains(where: { $0.id == target.id }) {
+                        verificationFailed = true; result = M("검증 실패 · 설치된 대상을 찾지 못함")
+                    }
                     if request.action == .uninstall, let target, exitCode == 0, after.contains(where: { $0.id == target.id }) { verificationFailed = true; result = M("검증 실패 · 대상이 아직 설치되어 있음") }
                     if request.action == .upgrade, let target, exitCode == 0, after.first(where: { $0.id == target.id })?.outdated != false { verificationFailed = true; result = M("검증 필요 · 업데이트 상태 미해결") }
                     if request.action == .update, exitCode == 0 {

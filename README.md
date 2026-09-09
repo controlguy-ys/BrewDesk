@@ -6,14 +6,14 @@ Your Homebrew apps and developer tools, in one native macOS app.
 
 **English** · [한국어](README.ko.md)
 
-[Download v0.2.2 for Apple Silicon](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.2.2) · [Watch the 60-second walkthrough](docs/media/brewdesk-walkthrough.mp4)
+[Download v0.3.0 for Apple Silicon](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.3.0) · [Watch the 60-second walkthrough](docs/media/brewdesk-walkthrough.mp4)
 
 ![BrewDesk installed packages](docs/media/installed-en.png)
 
 ## Download and run
 
 1. Install [Homebrew](https://brew.sh) if it is not already available.
-2. Download `BrewDesk-0.2.2-macos-arm64.dmg` from the [release page](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.2.2).
+2. Download `BrewDesk-0.3.0-macos-arm64.dmg` from the [release page](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.3.0).
 3. Open the DMG, drag **BrewDesk** into **Applications**, and launch it.
 4. BrewDesk detects the Homebrew environment. If more than one is available, choose one in **Settings**.
 
@@ -29,7 +29,7 @@ shasum -a 256 -c SHA256SUMS.txt
 
 ## What you can do
 
-BrewDesk manages packages already installed through Homebrew. Installing new packages is not supported.
+BrewDesk manages installed packages and searches Homebrew for new Formulae and Casks.
 
 - Browse installed Formulae and Casks with search, sorting, and type filters.
 - Inspect installed and available versions, dependencies, and verified installation paths.
@@ -59,6 +59,18 @@ Formula removal is blocked when installed dependents are found. Cask removal use
 | ![Removal confirmation](docs/media/removal-confirmation.png) | ![Korean language settings](docs/media/language-ko.png) |
 
 [All screenshots and capture notes](docs/media/README.md)
+
+## Install packages
+
+Open **Install packages**, choose Formulae or Casks, enter a package name, and press Search or Return. Select a result to load its description, version, dependencies, and homepage. **Install…** opens a confirmation with the exact command. Installed packages cannot be installed again from this screen. After installation, BrewDesk verifies the installed package and records its changes. Search displays up to 200 matches; narrow the query when needed. Package metadata stays in Homebrew’s original language.
+
+The top-right toolbar has **Check for updates** on the left and **Update** on the right. The left button reviews and runs `brew update`; the right reviews all available unpinned package upgrades. Refresh installed state with **⌘R** or the View menu.
+
+## History and terminal confirmations
+
+Click anywhere on a history summary row, including its result, date, or blank space, to expand or collapse it. Log text selection and copy/save buttons remain independent.
+
+Explicit terminal questions ending in `[y/n]` or `(yes/no)` are shown in a **Yes / No** popup while the process is waiting in normal line-input mode. The answer is sent to the running process; **Respond in terminal** leaves it unanswered for manual input. Password prompts, raw-input prompts, and unrecognized questions remain in the terminal. Detection resumes when normal echoed line input returns after authentication; secret-input log suppression remains in force. No response is sent automatically.
 
 ## Language support
 
@@ -97,6 +109,6 @@ The XCTest suite covers command validation, JSON parsing, version changes, histo
 
 History stores the latest 200 command records in `~/Library/Application Support/BrewDesk/history.json`, with directory permissions `0700` and file permissions `0600`. Terminal input is not saved. Output is omitted while terminal echo is disabled and for the remainder of an operation after secret input is sent. Saved logs may therefore be incomplete. Terminal output and manually exported logs can contain local paths and installer messages.
 
-BrewDesk does not install new packages, manage services, run Homebrew as root, or roll back changes. Self-updating and `latest` Casks have update-check limitations. Observed changes cannot always distinguish BrewDesk operations from concurrent external modifications.
+BrewDesk does not manage services, run Homebrew as root, or roll back changes. Self-updating and `latest` Casks have update-check limitations. Observed changes cannot always distinguish BrewDesk operations from concurrent external modifications.
 
 Built with SwiftUI and [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm). See [third-party notices](THIRD_PARTY_NOTICES.md). Homebrew command behavior is documented in the [Homebrew manual](https://docs.brew.sh/Manpage) and [JSON query documentation](https://docs.brew.sh/Querying-Brew).

@@ -31,7 +31,7 @@ struct BrewEnvironment: Identifiable, Hashable, Codable {
     let prefix: String
     let version: String
 }
-enum BrewAction: String, Codable { case upgrade, uninstall, update }
+enum BrewAction: String, Codable { case upgrade, uninstall, update, install }
 struct BrewCommand: Equatable {
     let executable: String
     let arguments: [String]

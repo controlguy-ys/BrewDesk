@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 struct ContentView: View {
     @ObservedObject var model: AppModel
-    private let sections = [("installed", "설치됨", "square.stack.3d.up"), ("updates", "업데이트", "arrow.down.circle"), ("history", "작업 기록", "clock.arrow.circlepath"), ("settings", "설정", "slider.horizontal.3")]
+    private let sections = [("installed", "설치됨", "square.stack.3d.up"), ("updates", "업데이트", "arrow.down.circle"), ("install", "패키지 설치", "plus.app"), ("history", "작업 기록", "clock.arrow.circlepath"), ("settings", "설정", "slider.horizontal.3")]
     var body: some View {
         NavigationSplitView {
             VStack(alignment: .leading, spacing: 24) {
@@ -68,6 +68,7 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 if model.section == "settings" { settings }
                 else if model.section == "history" { history }
+                else if model.section == "install" { InstallView(model: model) }
                 else { library }
                 Divider()
                 console
@@ -77,8 +78,10 @@ struct ContentView: View {
         .navigationTitle("")
         .toolbar {
             ToolbarItemGroup {
-                Button { Task { await model.refresh() } } label: { Label(L("목록 새로고침"), systemImage: "arrow.clockwise") }.disabled(model.unavailable || model.environment == nil)
-                Button { model.prepare(.update) } label: { Label(L("업데이트 확인"), systemImage: "arrow.down.circle") }.disabled(model.unavailable || model.environment == nil)
+                Button { model.prepare(.update) } label: { Text(L("업데이트 확인")) }
+                    .disabled(model.unavailable || model.environment == nil)
+                Button { model.prepareAllUpgrades() } label: { Text(L("패키지 업데이트 실행")) }
+                    .disabled(model.unavailable || model.environment == nil || model.upgradeable.isEmpty)
             }
         }
         .sheet(item: $model.pending) { request in confirmation(request) }
@@ -203,7 +206,7 @@ struct ContentView: View {
                             HStack { Button(L("로그 복사")) { model.copyLog(record.log) }; Button(L("로그 저장…")) { model.saveLog(record.log) } }
                             Text(record.log.isEmpty ? L("저장된 출력 없음") : record.log).font(.system(size: 11, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                         }.padding(.top, 12)
-                    } label: { VStack(alignment: .leading, spacing: 4) { Text(record.displayResult).fontWeight(.semibold); Text(L10n.date(record.date)).font(.caption).foregroundStyle(.secondary) } }.padding(16).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+                    } label: { VStack(alignment: .leading, spacing: 4) { Text(record.displayResult).fontWeight(.semibold); Text(L10n.date(record.date)).font(.caption).foregroundStyle(.secondary) } }.disclosureGroupStyle(HistoryDisclosureStyle()).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
                 }
             }.padding(28).frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -211,24 +214,51 @@ struct ContentView: View {
     private var console: some View { ConsolePanel(model: model, runner: model.runner) }
     private func confirmation(_ request: PendingOperation) -> some View {
         VStack(alignment: .leading, spacing: 18) {
-            Label(request.action == .uninstall ? L("제거할 항목 확인") : request.action == .update ? L("업데이트 확인") : L("업데이트할 항목 확인"), systemImage: request.action == .uninstall ? "trash" : "arrow.down.circle").font(.title2.bold())
+            Label(request.action == .uninstall ? L("제거할 항목 확인") : request.action == .update ? L("업데이트 확인") : request.action == .install ? L("설치할 항목 확인") : L("업데이트할 항목 확인"), systemImage: request.action == .uninstall ? "trash" : "arrow.down.circle").font(.title2.bold())
             Text(request.environment.executable).font(.caption.monospaced()).foregroundStyle(.secondary)
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     if request.action == .update { Text(L("Homebrew와 패키지 정의를 갱신한 뒤 업데이트 대상을 조회합니다. 설치된 패키지의 업그레이드는 별도 선택합니다.")) }
                     ForEach(request.packages) { p in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(p.name).bold(); Text(request.action == .upgrade ? "\(p.installed) → \(p.available)" : L("설치 버전 \(p.installed)"))
+                            Text(p.name).bold(); Text(request.action == .upgrade ? "\(p.installed) → \(p.available)" : request.action == .install ? L("설치할 버전 \(p.available)") : L("설치 버전 \(p.installed)"))
                             if let cmd = try? BrewCommandFactory.mutation(request.action, package: p, environment: request.environment) { Text(cmd.display).font(.caption.monospaced()).foregroundStyle(.secondary) }
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }.frame(maxHeight: 240)
             Text(request.action == .uninstall ? L("설정·캐시 정리(--zap)와 강제 제거는 사용하지 않습니다. 사용 중인 Formula는 제거를 차단합니다. Cask에 포함된 제거 스크립트가 실행될 수 있습니다.") : L("의존 패키지 등 추가 변경이 발생할 수 있습니다. 실제 변경은 실행 후 기록됩니다.")).font(.callout).foregroundStyle(.secondary)
-            HStack { Spacer(); Button(L("취소")) { model.pending = nil }.keyboardShortcut(.cancelAction); Button(request.action == .uninstall ? L("제거 실행") : L("실행")) { Task { await model.execute(request) } }.buttonStyle(.borderedProminent) }
+            HStack { Spacer(); Button(L("취소")) { model.pending = nil }.keyboardShortcut(.cancelAction); Button(request.action == .uninstall ? L("제거 실행") : request.action == .install ? L("설치 실행") : L("실행")) { Task { await model.execute(request) } }.buttonStyle(.borderedProminent) }
         }.padding(28).frame(width: 540)
     }
 }
+/// Keeps the whole summary row clickable without intercepting log selection or buttons.
+struct HistoryDisclosureStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation { configuration.isExpanded.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: configuration.isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    configuration.label
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(configuration.isExpanded ? L("펼쳐짐") : L("접힘"))
+            if configuration.isExpanded {
+                configuration.content.padding(.horizontal, 16).padding(.bottom, 16)
+            }
+        }
+    }
+}
+
 struct ConsolePanel: View {
     @ObservedObject var model: AppModel
     @ObservedObject var runner: PTYRunner
@@ -255,6 +285,16 @@ struct ConsolePanel: View {
                 if model.busy { Text(L("인증 또는 확인 입력이 필요하면 위 콘솔을 클릭하세요. 중단은 원상 복구가 아닙니다.")).font(.caption2).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(6) }
             }
         }.background(.bar)
+        .alert(L("터미널 확인 요청"), isPresented: Binding(
+            get: { runner.confirmation != nil },
+            set: { _ in }
+        ), presenting: runner.confirmation) { request in
+            Button(L("예")) { runner.answer(request, yes: true) }
+            Button(L("아니요"), role: .cancel) { runner.answer(request, yes: false) }
+            Button(L("터미널에서 응답")) { runner.useTerminal() }
+        } message: { request in
+            Text(request.question + "\n\n" + L("실행 중인 명령의 질문입니다. 응답은 터미널로 전달됩니다."))
+        }
     }
 }
 
