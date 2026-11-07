@@ -1,8 +1,13 @@
 # BrewDesk
 
+[![macOS](https://img.shields.io/badge/macOS-14%2B_(Apple_Silicon)-000000)](https://github.com/controlguy-ys/BrewDesk/releases/tag/v0.4.0)
+[![Swift](https://img.shields.io/badge/Swift-6.3-F05138)](#build-and-test)
+[![Managers](https://img.shields.io/badge/Package_Managers-Homebrew_%7C_npm_%7C_pip3_%7C_pipx_%7C_uv_%7C_Cargo_%7C_RubyGems-0082FC)](#package-managers-and-scope)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 <img src="assets/BrewDesk-icon.png" alt="BrewDesk app icon" width="128">
 
-Homebrew, npm, pip3, pipx, uv, Cargo and RubyGems, in one native macOS app.
+**Homebrew, npm, pip3, pipx, uv, Cargo, and RubyGems — unified in one native macOS app with explicit command review, embedded PTY execution, and post-operation version verification.**
 
 **English** · [한국어](README.ko.md)
 
